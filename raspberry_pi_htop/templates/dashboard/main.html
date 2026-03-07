@@ -1,0 +1,394 @@
+{% extends 'dashboard/base.html' %} {% block content %}
+<div class="container">
+  <!-- Header -->
+  <div class="header">
+    <h1>Raspberry Pi Dashboard</h1>
+    <div class="header-info">
+      <span id="uptime">Uptime: Calculating...</span>
+      <span class="status-badge">System Online</span>
+    </div>
+  </div>
+
+  <!-- Main Metrics Grid -->
+  <div class="grid">
+    <!-- CPU Usage -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">CPU Usage</span>
+        <div class="card-icon icon-primary">💻</div>
+      </div>
+      <div class="metric-value" id="cpu-percent">
+        {{ stats.cpu.percent|floatformat:1 }}%
+      </div>
+      <div class="metric-label">{{ stats.cpu.count }} cores</div>
+      <div class="progress-bar">
+        <div
+          class="progress-fill progress-primary"
+          id="cpu-progress"
+          style="width: {{ stats.cpu.percent }}%"
+        ></div>
+      </div>
+    </div>
+
+    <!-- CPU Temperature -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">CPU Temperature</span>
+        <div class="card-icon icon-warning">🌡️</div>
+      </div>
+      <div class="metric-value" id="cpu-temp">
+        {% if stats.cpu.temp %}{{ stats.cpu.temp|floatformat:1 }}°C{% else
+        %}N/A{% endif %}
+      </div>
+      <div class="metric-label">
+        {% if stats.cpu.freq %}{{ stats.cpu.freq|floatformat:0 }} MHz{% else
+        %}Freq: N/A{% endif %}
+      </div>
+      <div class="progress-bar">
+        <div
+          class="progress-fill {% if stats.cpu.temp > 70 %}progress-danger{% elif stats.cpu.temp > 60 %}progress-warning{% else %}progress-success{% endif %}"
+          id="temp-progress"
+          style="width: {% if stats.cpu.temp %}{{ stats.cpu.temp }}{% else %}0{% endif %}%"
+        ></div>
+      </div>
+    </div>
+
+    <!-- Memory Usage -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Memory (RAM)</span>
+        <div class="card-icon icon-success">🧠</div>
+      </div>
+      <div class="metric-value" id="memory-percent">
+        {{ stats.memory.percent|floatformat:1 }}%
+      </div>
+      <div class="metric-label">
+        {{ stats.memory.used|filesizeformat }} / {{
+        stats.memory.total|filesizeformat }}
+      </div>
+      <div class="progress-bar">
+        <div
+          class="progress-fill {% if stats.memory.percent > 80 %}progress-danger{% elif stats.memory.percent > 60 %}progress-warning{% else %}progress-success{% endif %}"
+          id="memory-progress"
+          style="width: {{ stats.memory.percent }}%"
+        ></div>
+      </div>
+    </div>
+
+    <!-- Swap Usage -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Swap Memory</span>
+        <div class="card-icon icon-primary">💾</div>
+      </div>
+      <div class="metric-value" id="swap-percent">
+        {{ stats.swap.percent|floatformat:1 }}%
+      </div>
+      <div class="metric-label">
+        {{ stats.swap.used|filesizeformat }} / {{
+        stats.swap.total|filesizeformat }}
+      </div>
+      <div class="progress-bar">
+        <div
+          class="progress-fill {% if stats.swap.percent > 80 %}progress-danger{% elif stats.swap.percent > 60 %}progress-warning{% else %}progress-primary{% endif %}"
+          id="swap-progress"
+          style="width: {{ stats.swap.percent }}%"
+        ></div>
+      </div>
+    </div>
+
+    <!-- Disk Usage -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Disk Usage</span>
+        <div class="card-icon icon-warning">💿</div>
+      </div>
+      <div class="metric-value" id="disk-percent">
+        {{ stats.disk.percent|floatformat:1 }}%
+      </div>
+      <div class="metric-label">
+        {{ stats.disk.used|filesizeformat }} / {{
+        stats.disk.total|filesizeformat }}
+      </div>
+      <div class="progress-bar">
+        <div
+          class="progress-fill {% if stats.disk.percent > 80 %}progress-danger{% elif stats.disk.percent > 60 %}progress-warning{% else %}progress-success{% endif %}"
+          id="disk-progress"
+          style="width: {{ stats.disk.percent }}%"
+        ></div>
+      </div>
+    </div>
+
+    <!-- Network -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Network</span>
+        <div class="card-icon icon-success">🌐</div>
+      </div>
+      <div class="metric-value" style="font-size: 20px">
+        ↑ {{ stats.network.bytes_sent|filesizeformat }}
+      </div>
+      <div class="metric-label">
+        ↓ {{ stats.network.bytes_recv|filesizeformat }}
+      </div>
+    </div>
+
+    <!-- Fan Speed -->
+    {% if stats.fan_speed %}
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Fan Speed</span>
+        <div class="card-icon icon-primary">🌀</div>
+      </div>
+      <div class="metric-value" id="fan-speed">{{ stats.fan_speed }}</div>
+      <div class="metric-label">RPM</div>
+    </div>
+    {% endif %}
+
+    <!-- System Info -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">System Info</span>
+        <div class="card-icon icon-primary">ℹ️</div>
+      </div>
+      <div class="metric-label" style="margin-bottom: 8px">
+        <strong>OS:</strong> {{ stats.platform.system }}
+      </div>
+      <div class="metric-label" style="margin-bottom: 8px">
+        <strong>Kernel:</strong> {{ stats.platform.release }}
+      </div>
+      <div class="metric-label">
+        <strong>Arch:</strong> {{ stats.platform.machine }}
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts Row -->
+  <div class="chart-container">
+    <div class="chart-header">
+      <h2 class="chart-title">CPU & Memory History</h2>
+    </div>
+    <canvas id="systemChart" height="80"></canvas>
+  </div>
+
+  <!-- CPU Per Core -->
+  <div class="chart-container">
+    <div class="chart-header">
+      <h2 class="chart-title">CPU Usage Per Core</h2>
+    </div>
+    <canvas id="coreChart" height="80"></canvas>
+  </div>
+
+  <!-- Top Processes Table -->
+  <div class="table-container">
+    <h2 class="chart-title" style="margin-bottom: 20px">Top Processes</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>PID</th>
+          <th>Name</th>
+          <th>CPU %</th>
+          <th>Memory %</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="process-table">
+        {% for process in processes %}
+        <tr>
+          <td>{{ process.pid }}</td>
+          <td>{{ process.name }}</td>
+          <td>{{ process.cpu_percent|floatformat:1 }}%</td>
+          <td>{{ process.memory_percent|floatformat:1 }}%</td>
+          <td>
+            <span
+              class="badge {% if process.status == 'running' %}badge-success{% elif process.status == 'sleeping' %}badge-warning{% else %}badge-danger{% endif %}"
+            >
+              {{ process.status }}
+            </span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %} {% block extra_js %}
+<script>
+  // Format uptime
+  function formatUptime(seconds) {
+      const days = Math.floor(seconds / 86400);
+      const hours = Math.floor((seconds % 86400) / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      return `${days}d ${hours}h ${minutes}m`;
+  }
+
+  // Initialize uptime
+  const uptimeSeconds = {{ stats.uptime|floatformat:0 }};
+  document.getElementById('uptime').textContent = `Uptime: ${formatUptime(uptimeSeconds)}`;
+
+  // Historical data for charts
+  const historicalData = {
+      timestamps: [{% for metric in recent_metrics %}'{{ metric.timestamp|date:"H:i" }}'{% if not forloop.last %}, {% endif %}{% endfor %}],
+      cpu: [{% for metric in recent_metrics %}{{ metric.cpu_percent }}{% if not forloop.last %}, {% endif %}{% endfor %}],
+      memory: [{% for metric in recent_metrics %}{{ metric.memory_percent }}{% if not forloop.last %}, {% endif %}{% endfor %}],
+  };
+
+  // CPU per core data
+  const coreData = {{ stats.cpu.per_core|safe }};
+
+  // System Chart
+  const systemCtx = document.getElementById('systemChart').getContext('2d');
+  const systemChart = new Chart(systemCtx, {
+      type: 'line',
+      data: {
+          labels: historicalData.timestamps,
+          datasets: [
+              {
+                  label: 'CPU %',
+                  data: historicalData.cpu,
+                  borderColor: '#6366f1',
+                  backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                  tension: 0.4,
+                  fill: true
+              },
+              {
+                  label: 'Memory %',
+                  data: historicalData.memory,
+                  borderColor: '#10b981',
+                  backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                  tension: 0.4,
+                  fill: true
+              }
+          ]
+      },
+      options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          plugins: {
+              legend: {
+                  display: true,
+                  position: 'top'
+              }
+          },
+          scales: {
+              y: {
+                  beginAtZero: true,
+                  max: 100,
+                  ticks: {
+                      callback: function(value) {
+                          return value + '%';
+                      }
+                  }
+              }
+          }
+      }
+  });
+
+  // Core Chart
+  const coreCtx = document.getElementById('coreChart').getContext('2d');
+  const coreChart = new Chart(coreCtx, {
+      type: 'bar',
+      data: {
+          labels: coreData.map((_, i) => `Core ${i}`),
+          datasets: [{
+              label: 'CPU Usage %',
+              data: coreData,
+              backgroundColor: coreData.map(val =>
+                  val > 80 ? '#ef4444' : val > 60 ? '#f59e0b' : '#6366f1'
+              ),
+          }]
+      },
+      options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          plugins: {
+              legend: {
+                  display: false
+              }
+          },
+          scales: {
+              y: {
+                  beginAtZero: true,
+                  max: 100,
+                  ticks: {
+                      callback: function(value) {
+                          return value + '%';
+                      }
+                  }
+              }
+          }
+      }
+  });
+
+  // Auto-refresh every 5 seconds
+  setInterval(async function() {
+      try {
+          const response = await fetch('/api/stats/');
+          const stats = await response.json();
+
+          // Update metrics
+          document.getElementById('cpu-percent').textContent = stats.cpu.percent.toFixed(1) + '%';
+          document.getElementById('cpu-progress').style.width = stats.cpu.percent + '%';
+
+          if (stats.cpu.temp) {
+              document.getElementById('cpu-temp').textContent = stats.cpu.temp.toFixed(1) + '°C';
+              document.getElementById('temp-progress').style.width = stats.cpu.temp + '%';
+          }
+
+          document.getElementById('memory-percent').textContent = stats.memory.percent.toFixed(1) + '%';
+          document.getElementById('memory-progress').style.width = stats.memory.percent + '%';
+
+          document.getElementById('swap-percent').textContent = stats.swap.percent.toFixed(1) + '%';
+          document.getElementById('swap-progress').style.width = stats.swap.percent + '%';
+
+          document.getElementById('disk-percent').textContent = stats.disk.percent.toFixed(1) + '%';
+          document.getElementById('disk-progress').style.width = stats.disk.percent + '%';
+
+          if (stats.fan_speed && document.getElementById('fan-speed')) {
+              document.getElementById('fan-speed').textContent = stats.fan_speed;
+          }
+
+          // Update charts
+          systemChart.data.datasets[0].data.push(stats.cpu.percent);
+          systemChart.data.datasets[1].data.push(stats.memory.percent);
+          systemChart.data.labels.push(new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }));
+
+          // Keep only last 20 data points
+          if (systemChart.data.labels.length > 20) {
+              systemChart.data.datasets[0].data.shift();
+              systemChart.data.datasets[1].data.shift();
+              systemChart.data.labels.shift();
+          }
+          systemChart.update();
+
+          // Update core chart
+          coreChart.data.datasets[0].data = stats.cpu.per_core;
+          coreChart.data.datasets[0].backgroundColor = stats.cpu.per_core.map(val =>
+              val > 80 ? '#ef4444' : val > 60 ? '#f59e0b' : '#6366f1'
+          );
+          coreChart.update();
+
+          // Update processes
+          const processResponse = await fetch('/api/processes/');
+          const processData = await processResponse.json();
+          const tbody = document.getElementById('process-table');
+          tbody.innerHTML = processData.processes.slice(0, 10).map(proc => `
+              <tr>
+                  <td>${proc.pid}</td>
+                  <td>${proc.name}</td>
+                  <td>${proc.cpu_percent.toFixed(1)}%</td>
+                  <td>${proc.memory_percent.toFixed(1)}%</td>
+                  <td>
+                      <span class="badge ${proc.status === 'running' ? 'badge-success' : proc.status === 'sleeping' ? 'badge-warning' : 'badge-danger'}">
+                          ${proc.status}
+                      </span>
+                  </td>
+              </tr>
+          `).join('');
+
+      } catch (error) {
+          console.error('Error fetching stats:', error);
+      }
+  }, 5000);
+</script>
+{% endblock %}
