@@ -37,7 +37,7 @@
       <div class="metric-value" id="cpu-temp">
         {% if stats.cpu.temp %}{{ stats.cpu.temp|floatformat:1 }}°C{% else %}N/A{% endif %}
       </div>
-      <div class="metric-label" id="cpu-freq">
+      <div class="metric-label">
         {% if stats.cpu.freq %}{{ stats.cpu.freq|floatformat:0 }} MHz{% else %}Freq: N/A{% endif %}
       </div>
       <div class="progress-bar">
@@ -58,8 +58,7 @@
         {{ stats.memory.percent|floatformat:1 }}%
       </div>
       <div class="metric-label">
-        {{ stats.memory.used|filesizeformat }} / {{
-        stats.memory.total|filesizeformat }}
+        {{ stats.memory.used|filesizeformat }} / {{ stats.memory.total|filesizeformat }}
       </div>
       <div class="progress-bar">
         <div
@@ -72,8 +71,7 @@
         {{ stats.swap.percent|floatformat:1 }}%
       </div>
       <div class="metric-label">
-        {{ stats.swap.used|filesizeformat }} / {{
-        stats.swap.total|filesizeformat }}
+        {{ stats.swap.used|filesizeformat }} / {{ stats.swap.total|filesizeformat }}
       </div>
       <div class="progress-bar">
         <div
@@ -93,8 +91,7 @@
           {{ stats.disk.percent|floatformat:1 }}%
         </div>
         <div class="metric-label">
-          {{ stats.disk.used|filesizeformat }} / {{
-          stats.disk.total|filesizeformat }}
+          {{ stats.disk.used|filesizeformat }} / {{ stats.disk.total|filesizeformat }}
         </div>
         <div class="progress-bar">
           <div
