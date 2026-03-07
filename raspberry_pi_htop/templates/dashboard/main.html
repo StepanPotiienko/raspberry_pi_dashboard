@@ -35,12 +35,10 @@
         <span class="card-title">CPU Temperature</span>
       </div>
       <div class="metric-value" id="cpu-temp">
-        {% if stats.cpu.temp %}{{ stats.cpu.temp|floatformat:1 }}°C{% else
-        %}N/A{% endif %}
+        {% if stats.cpu.temp %}{{ stats.cpu.temp|floatformat:1 }}°C{% else %}N/A{% endif %}
       </div>
-      <div class="metric-label">
-        {% if stats.cpu.freq %}{{ stats.cpu.freq|floatformat:0 }} MHz{% else
-        %}Freq: N/A{% endif %}
+      <div class="metric-label" id="cpu-freq">
+        {% if stats.cpu.freq %}{{ stats.cpu.freq|floatformat:0 }} MHz{% else %}Freq: N/A{% endif %}
       </div>
       <div class="progress-bar">
         <div
