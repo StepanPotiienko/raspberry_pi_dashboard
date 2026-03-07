@@ -37,12 +37,10 @@
         <div class="card-icon icon-warning">🌡️</div>
       </div>
       <div class="metric-value" id="cpu-temp">
-        {% if stats.cpu.temp %}{{ stats.cpu.temp|floatformat:1 }}°C{% else
-        %}N/A{% endif %}
+        {% if stats.cpu.temp %}{{ stats.cpu.temp|floatformat:1 }}°C{% else %}N/A{% endif %}
       </div>
-      <div class="metric-label">
-        {% if stats.cpu.freq %}{{ stats.cpu.freq|floatformat:0 }} MHz{% else
-        %}Freq: N/A{% endif %}
+      <div class="metric-label" id="cpu-freq">
+        {% if stats.cpu.freq %}{{ stats.cpu.freq|floatformat:0 }} MHz{% else %}Freq: N/A{% endif %}
       </div>
       <div class="progress-bar">
         <div
@@ -125,10 +123,10 @@
         <span class="card-title">Network</span>
         <div class="card-icon icon-success">🌐</div>
       </div>
-      <div class="metric-value" style="font-size: 20px">
+      <div class="metric-value" id="network-sent" style="font-size: 20px">
         ↑ {{ stats.network.bytes_sent|filesizeformat }}
       </div>
-      <div class="metric-label">
+      <div class="metric-label" id="network-recv">
         ↓ {{ stats.network.bytes_recv|filesizeformat }}
       </div>
     </div>
@@ -222,9 +220,13 @@
       return `${days}d ${hours}h ${minutes}m`;
   }
 
-  // Initialize uptime
-  const uptimeSeconds = {{ stats.uptime|floatformat:0 }};
+  // Initialize uptime and tick every second
+  let uptimeSeconds = {{ stats.uptime|floatformat:0 }};
   document.getElementById('uptime').textContent = `Uptime: ${formatUptime(uptimeSeconds)}`;
+  setInterval(function() {
+      uptimeSeconds++;
+      document.getElementById('uptime').textContent = `Uptime: ${formatUptime(uptimeSeconds)}`;
+  }, 1000);
 
   // Historical data for charts
   const historicalData = {
@@ -333,7 +335,11 @@
           if (stats.cpu.temp) {
               document.getElementById('cpu-temp').textContent = stats.cpu.temp.toFixed(1) + '°C';
               document.getElementById('temp-progress').style.width = stats.cpu.temp + '%';
+          } else {
+              document.getElementById('cpu-temp').textContent = 'N/A';
           }
+
+          document.getElementById('cpu-freq').textContent = stats.cpu.freq ? Math.round(stats.cpu.freq) + ' MHz' : 'Freq: N/A';
 
           document.getElementById('memory-percent').textContent = stats.memory.percent.toFixed(1) + '%';
           document.getElementById('memory-progress').style.width = stats.memory.percent + '%';
@@ -347,6 +353,15 @@
           if (stats.fan_speed && document.getElementById('fan-speed')) {
               document.getElementById('fan-speed').textContent = stats.fan_speed;
           }
+
+          function formatBytes(bytes) {
+              if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(1) + ' GB';
+              if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + ' MB';
+              if (bytes >= 1024) return (bytes / 1024).toFixed(1) + ' KB';
+              return bytes + ' B';
+          }
+          document.getElementById('network-sent').textContent = '↑ ' + formatBytes(stats.network.bytes_sent);
+          document.getElementById('network-recv').textContent = '↓ ' + formatBytes(stats.network.bytes_recv);
 
           // Update charts
           systemChart.data.datasets[0].data.push(stats.cpu.percent);
@@ -389,6 +404,6 @@
       } catch (error) {
           console.error('Error fetching stats:', error);
       }
-  }, 5000);
+  }, 1000);
 </script>
 {% endblock %}
