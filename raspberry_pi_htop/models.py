@@ -34,6 +34,8 @@ class SystemMetrics(models.Model):
     # Network metrics
     network_bytes_sent = models.BigIntegerField(help_text="Total bytes sent")
     network_bytes_recv = models.BigIntegerField(help_text="Total bytes received")
+    packets_dropped_in = models.BigIntegerField(default=0, help_text="Total inbound packets dropped")
+    packets_dropped_out = models.BigIntegerField(default=0, help_text="Total outbound packets dropped")
 
     # Fan speed (if available)
     fan_speed = models.IntegerField(null=True, blank=True, help_text="Fan speed in RPM")
