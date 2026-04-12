@@ -102,6 +102,8 @@ def get_system_stats():
             "bytes_recv": network.bytes_recv,
             "packets_sent": network.packets_sent,
             "packets_recv": network.packets_recv,
+            "packets_dropped_in": network.dropin,
+            "packets_dropped_out": network.dropout,
         },
         "fan_speed": fan_speed,
         "uptime": uptime,
@@ -169,6 +171,8 @@ def api_system_stats(request):
         disk_total=stats["disk"]["total"],
         network_bytes_sent=stats["network"]["bytes_sent"],
         network_bytes_recv=stats["network"]["bytes_recv"],
+        packets_dropped_in=stats["network"]["packets_dropped_in"],
+        packets_dropped_out=stats["network"]["packets_dropped_out"],
         fan_speed=stats["fan_speed"],
     )
 
