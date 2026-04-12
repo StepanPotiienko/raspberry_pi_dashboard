@@ -165,18 +165,18 @@
   }
 
   // Initialize uptime
-  const uptimeSeconds = {{ stats.uptime| floatformat: 0 }};
+  const uptimeSeconds = {{ stats.uptime|floatformat:0 }};
   document.getElementById('uptime').textContent = `Uptime: ${formatUptime(uptimeSeconds)}`;
 
   // Historical data for charts
   const historicalData = {
     timestamps: [{% for metric in recent_metrics %}'{{ metric.timestamp|date:"H:i" }}'{% if not forloop.last %}, {% endif %} {% endfor %}],
-  cpu: [{% for metric in recent_metrics %}{ { metric.cpu_percent } } {% if not forloop.last %}, {% endif %} {% endfor %}],
-  memory: [{% for metric in recent_metrics %}{ { metric.memory_percent } } {% if not forloop.last %}, {% endif %} {% endfor %}],
+  cpu: [{% for metric in recent_metrics %}{{ metric.cpu_percent }}{% if not forloop.last %}, {% endif %} {% endfor %}],
+  memory: [{% for metric in recent_metrics %}{{ metric.memory_percent }}{% if not forloop.last %}, {% endif %} {% endfor %}],
     };
 
   // CPU per core data
-  const coreData = {{ stats.cpu.per_core| safe }};
+  const coreData = {{ stats.cpu.per_core|safe }};
 
   const systemCtx = document.getElementById('systemChart').getContext('2d');
   const systemChart = new Chart(systemCtx, {
