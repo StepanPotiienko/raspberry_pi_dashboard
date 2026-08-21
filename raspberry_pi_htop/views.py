@@ -53,7 +53,7 @@ def get_system_stats():
     cpu_freq = psutil.cpu_freq()
     cpu_temp = get_cpu_temperature()
     cpu_count = psutil.cpu_count()
-    cpu_per_core = psutil.cpu_percent(interval=1, percpu=True)
+    cpu_per_core = psutil.cpu_percent(interval=None, percpu=True)
 
     # Memory metrics
     memory = psutil.virtual_memory()
