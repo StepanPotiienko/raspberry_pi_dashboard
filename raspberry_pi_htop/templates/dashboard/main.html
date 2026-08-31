@@ -36,6 +36,13 @@
       <div class="metric-label">
         {% if stats.cpu.freq %}{{ stats.cpu.freq|floatformat:0 }} MHz{% else %}Freq: N/A{% endif %}
       </div>
+      <div class="metric-label" style="margin-top: 6px; font-size: 12px">
+        {% if temp_summary.avg %}
+          Avg <strong>{{ temp_summary.avg }}°C</strong> · Peak <strong>{{ temp_summary.peak }}°C</strong> · Min <strong>{{ temp_summary.min }}°C</strong> (24h)
+        {% else %}
+          No historical data yet
+        {% endif %}
+      </div>
       <div class="progress-bar">
         <div
           class="progress-fill {% if stats.cpu.temp > 70 %}progress-danger{% elif stats.cpu.temp > 60 %}progress-warning{% else %}progress-success{% endif %}"
@@ -173,6 +180,7 @@
     timestamps: [{% for metric in recent_metrics %}'{{ metric.timestamp|date:"H:i" }}'{% if not forloop.last %}, {% endif %} {% endfor %}],
   cpu: [{% for metric in recent_metrics %}{{ metric.cpu_percent }}{% if not forloop.last %}, {% endif %} {% endfor %}],
   memory: [{% for metric in recent_metrics %}{{ metric.memory_percent }}{% if not forloop.last %}, {% endif %} {% endfor %}],
+  temp: [{% for metric in recent_metrics %}{% if metric.cpu_temp %}{{ metric.cpu_temp }}{% else %}null{% endif %}{% if not forloop.last %}, {% endif %} {% endfor %}],
     };
 
   // CPU per core data
@@ -199,6 +207,15 @@
           backgroundColor: 'rgba(16, 185, 129, 0.1)',
           tension: 0.6,
           fill: true
+        },
+        {
+          label: 'Temp °C',
+          data: historicalData.temp,
+          borderColor: '#ef4444',
+          backgroundColor: 'rgba(239, 68, 68, 0.1)',
+          tension: 0.4,
+          fill: false,
+          yAxisID: 'yTemp'
         }
       ]
     },
@@ -218,6 +235,19 @@
           ticks: {
             callback: function (value) {
               return value + '%';
+            }
+          }
+        },
+        yTemp: {
+          position: 'right',
+          beginAtZero: true,
+          max: 100,
+          grid: {
+            drawOnChartArea: false
+          },
+          ticks: {
+            callback: function (value) {
+              return value + '°C';
             }
           }
         }
@@ -249,11 +279,13 @@
 
       systemChart.data.datasets[0].data.push(stats.cpu.percent);
       systemChart.data.datasets[1].data.push(stats.memory.percent);
+      systemChart.data.datasets[2].data.push(stats.cpu.temp);
       systemChart.data.labels.push(new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }));
 
       if (systemChart.data.labels.length > 20) {
         systemChart.data.datasets[0].data.shift();
         systemChart.data.datasets[1].data.shift();
+        systemChart.data.datasets[2].data.shift();
         systemChart.data.labels.shift();
       }
       systemChart.update();

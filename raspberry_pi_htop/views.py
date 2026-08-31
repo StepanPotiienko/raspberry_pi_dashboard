@@ -140,15 +140,37 @@ def dashboard(request):
     # Get recent metrics for charts (last 20 entries)
     recent_metrics = SystemMetrics.objects.all()[:20]
 
+    # Temperature summary over the last 24h (avg / peak / min)
+    temp_summary = get_temp_summary(hours=24)
+
     context = {
         "stats": stats,
         "processes": top_processes,
         "recent_metrics": list(
             reversed(recent_metrics)
         ),  # Reverse for chronological order
+        "temp_summary": temp_summary,
     }
 
     return render(request, "dashboard/main.html", context)
+
+
+def get_temp_summary(hours=24):
+    """Compute avg / peak / min CPU temperature over the last N hours."""
+    since = timezone.now() - timedelta(hours=hours)
+    temps = list(
+        SystemMetrics.objects.filter(timestamp__gte=since)
+        .exclude(cpu_temp__isnull=True)
+        .values_list("cpu_temp", flat=True)
+    )
+    if not temps:
+        return {"avg": None, "peak": None, "min": None, "count": 0}
+    return {
+        "avg": round(sum(temps) / len(temps), 1),
+        "peak": round(max(temps), 1),
+        "min": round(min(temps), 1),
+        "count": len(temps),
+    }
 
 
 def api_system_stats(request):
