@@ -109,16 +109,12 @@ class APITests(TestCase):
         self.assertIn("percent", data["cpu"])
         self.assertIn("percent", data["memory"])
 
-    def test_api_stats_writes_metric_row(self):
+    def test_api_stats_is_read_only(self):
+        """The stats API must not write to the DB; persistence is the
+        collect_metrics command's job (systemd timer)."""
         before = SystemMetrics.objects.count()
         self.client.get(reverse("dashboard:api_stats"))
-        self.assertEqual(SystemMetrics.objects.count(), before + 1)
-
-    def test_api_stats_cleans_old_records(self):
-        for i in range(1005):
-            make_metric(cpu_percent=float(i % 100))
-        self.client.get(reverse("dashboard:api_stats"))
-        self.assertEqual(SystemMetrics.objects.count(), 1000)
+        self.assertEqual(SystemMetrics.objects.count(), before)
 
     def test_api_processes_returns_list(self):
         resp = self.client.get(reverse("dashboard:api_processes"))
@@ -161,3 +157,66 @@ class ViewsUnitTests(TestCase):
         self.assertIn("network", stats)
         self.assertIn("per_core", stats["cpu"])
         self.assertEqual(len(stats["cpu"]["per_core"]), stats["cpu"]["count"])
+
+
+class GetTempSummaryTests(TestCase):
+    def test_no_data_returns_nulls(self):
+        summary = views.get_temp_summary(hours=24)
+        self.assertEqual(summary, {"avg": None, "peak": None, "min": None, "count": 0})
+
+    def test_all_null_temps_returns_count_zero(self):
+        make_metric(cpu_temp=None)
+        summary = views.get_temp_summary(hours=24)
+        self.assertEqual(summary["count"], 0)
+        self.assertIsNone(summary["avg"])
+
+    def test_excludes_null_temps(self):
+        make_metric(cpu_temp=60.0)
+        make_metric(cpu_temp=None)
+        summary = views.get_temp_summary(hours=24)
+        self.assertEqual(summary["count"], 1)
+        self.assertEqual(summary["avg"], 60.0)
+
+    def test_computes_avg_peak_min(self):
+        make_metric(cpu_temp=30.0)
+        make_metric(cpu_temp=50.0)
+        make_metric(cpu_temp=70.0)
+        summary = views.get_temp_summary(hours=24)
+        self.assertEqual(summary["count"], 3)
+        self.assertEqual(summary["avg"], 50.0)
+        self.assertEqual(summary["peak"], 70.0)
+        self.assertEqual(summary["min"], 30.0)
+
+    def test_excludes_rows_outside_window(self):
+        make_metric(cpu_temp=40.0,
+                    timestamp=timezone.now() - timezone.timedelta(hours=48))
+        make_metric(cpu_temp=80.0)
+        summary = views.get_temp_summary(hours=24)
+        self.assertEqual(summary["count"], 1)
+        self.assertEqual(summary["avg"], 80.0)
+
+
+class CollectMetricsCommandTests(TestCase):
+    def test_command_creates_metric_row(self):
+        from django.core.management import call_command
+        before = SystemMetrics.objects.count()
+        call_command("collect_metrics", verbosity=0)
+        self.assertEqual(SystemMetrics.objects.count(), before + 1)
+
+
+class ApiHistoricalDataTests(TestCase):
+    def test_invalid_hours_clamped_to_default(self):
+        make_metric(cpu_percent=10.0)
+        data = self.client.get(
+            reverse("dashboard:api_historical"), {"hours": "abc"}).json()
+        self.assertIn("cpu", data)
+
+    def test_temp_preserves_nulls(self):
+        make_metric(cpu_temp=None, cpu_percent=5.0)
+        make_metric(cpu_temp=0.0, cpu_percent=6.0)
+        data = self.client.get(
+            reverse("dashboard:api_historical"), {"hours": 1}).json()
+        self.assertEqual(len(data["temp"]), len(data["timestamps"]))
+        # A legitimate 0.0 reading must survive, not be dropped.
+        self.assertIn(0.0, data["temp"])
+

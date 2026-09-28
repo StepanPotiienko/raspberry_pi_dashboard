@@ -5,7 +5,7 @@ from django.utils import timezone
 class SystemMetrics(models.Model):
     """Store historical system metrics for trending"""
 
-    timestamp = models.DateTimeField(default=timezone.now, db_index=True)
+    timestamp = models.DateTimeField(default=timezone.now)
 
     # CPU metrics
     cpu_percent = models.FloatField(help_text="Overall CPU usage percentage")

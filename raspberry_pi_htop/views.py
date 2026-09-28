@@ -1,12 +1,16 @@
 from django.shortcuts import render
 from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
+from django.db.models import Avg, Max, Min, Count
+from django.db import transaction
 from django.utils import timezone
 from datetime import timedelta
 import psutil
 import platform
 import os
+import logging
 from .models import SystemMetrics, ProcessInfo
+
+logger = logging.getLogger(__name__)
 
 
 def get_cpu_temperature():
@@ -17,8 +21,8 @@ def get_cpu_temperature():
             with open("/sys/class/thermal/thermal_zone0/temp", "r") as f:
                 temp = float(f.read()) / 1000.0
                 return round(temp, 1)
-    except:
-        pass
+    except (OSError, ValueError):
+        logger.warning("Failed to read CPU temperature from sysfs", exc_info=True)
 
     # Try psutil sensors (might work on some systems)
     try:
@@ -27,8 +31,8 @@ def get_cpu_temperature():
             for name, entries in temps.items():
                 if entries:
                     return round(entries[0].current, 1)
-    except:
-        pass
+    except (OSError, AttributeError, RuntimeError):
+        logger.warning("Failed to read CPU temperature via psutil", exc_info=True)
 
     return None
 
@@ -41,8 +45,8 @@ def get_fan_speed():
             for name, entries in fans.items():
                 if entries:
                     return entries[0].current
-    except:
-        pass
+    except (OSError, AttributeError, RuntimeError):
+        logger.warning("Failed to read fan speed via psutil", exc_info=True)
     return None
 
 
@@ -158,26 +162,32 @@ def dashboard(request):
 def get_temp_summary(hours=24):
     """Compute avg / peak / min CPU temperature over the last N hours."""
     since = timezone.now() - timedelta(hours=hours)
-    temps = list(
-        SystemMetrics.objects.filter(timestamp__gte=since)
-        .exclude(cpu_temp__isnull=True)
-        .values_list("cpu_temp", flat=True)
+    summary = SystemMetrics.objects.filter(
+        timestamp__gte=since,
+        cpu_temp__isnull=False,
+    ).aggregate(
+        avg=Avg("cpu_temp"),
+        peak=Max("cpu_temp"),
+        min=Min("cpu_temp"),
+        count=Count("cpu_temp"),
     )
-    if not temps:
+    count = summary["count"] or 0
+    if not count:
         return {"avg": None, "peak": None, "min": None, "count": 0}
     return {
-        "avg": round(sum(temps) / len(temps), 1),
-        "peak": round(max(temps), 1),
-        "min": round(min(temps), 1),
-        "count": len(temps),
+        "avg": round(summary["avg"], 1),
+        "peak": round(summary["peak"], 1),
+        "min": round(summary["min"], 1),
+        "count": count,
     }
 
 
-def api_system_stats(request):
-    """API endpoint for real-time system stats"""
-    stats = get_system_stats()
+def save_metrics(stats, keep=5000):
+    """Persist a stats dict to a SystemMetrics row and prune old rows.
 
-    # Save to database
+    Keeps the most recent `keep` rows. Pruning uses a pk-only slice so it
+    never materializes full model instances for the stale rows.
+    """
     SystemMetrics.objects.create(
         cpu_percent=stats["cpu"]["percent"],
         cpu_temp=stats["cpu"]["temp"],
@@ -198,12 +208,22 @@ def api_system_stats(request):
         fan_speed=stats["fan_speed"],
     )
 
-    # Clean old records (keep last 1000)
-    old_metrics = SystemMetrics.objects.all()[1000:]
-    if old_metrics:
-        SystemMetrics.objects.filter(id__in=[m.id for m in old_metrics]).delete()
+    stale_pks = list(
+        SystemMetrics.objects.order_by("-timestamp")
+        .values_list("pk", flat=True)[keep:]
+    )
+    if stale_pks:
+        with transaction.atomic():
+            SystemMetrics.objects.filter(pk__in=stale_pks).delete()
 
-    return JsonResponse(stats)
+
+def api_system_stats(request):
+    """API endpoint for real-time system stats (read-only).
+
+    Persistence is handled by the `collect_metrics` management command on a
+    systemd timer, so this endpoint must not write on every poll.
+    """
+    return JsonResponse(get_system_stats())
 
 
 def api_processes(request):
@@ -213,18 +233,29 @@ def api_processes(request):
 
 
 def api_historical_data(request):
-    """API endpoint for historical metrics"""
-    hours = int(request.GET.get("hours", 1))
+    """API endpoint for historical metrics."""
+    try:
+        hours = int(request.GET.get("hours", 1))
+    except (TypeError, ValueError):
+        hours = 1
+    hours = max(1, min(hours, 168))  # clamp to 1..168 (1 week)
     since = timezone.now() - timedelta(hours=hours)
 
-    metrics = SystemMetrics.objects.filter(timestamp__gte=since).order_by("timestamp")
+    rows = list(
+        SystemMetrics.objects.filter(timestamp__gte=since)
+        .order_by("timestamp")
+        .values_list(
+            "timestamp", "cpu_percent", "memory_percent", "disk_percent", "cpu_temp"
+        )
+    )
 
     data = {
-        "timestamps": [m.timestamp.isoformat() for m in metrics],
-        "cpu": [m.cpu_percent for m in metrics],
-        "memory": [m.memory_percent for m in metrics],
-        "disk": [m.disk_percent for m in metrics],
-        "temp": [m.cpu_temp for m in metrics if m.cpu_temp],
+        "timestamps": [r[0].isoformat() for r in rows],
+        "cpu": [r[1] for r in rows],
+        "memory": [r[2] for r in rows],
+        "disk": [r[3] for r in rows],
+        # Preserve nulls for alignment; do not drop legitimate 0.0 readings.
+        "temp": [r[4] for r in rows],
     }
 
     return JsonResponse(data)
